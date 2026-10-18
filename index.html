@@ -1,0 +1,779 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>SPA101 Quest</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,800&family=DM+Sans:wght@400;500;700&display=swap">
+<style>
+/* Layout: a single centered game column. Top HUD (level, XP, streak), tabbed map / games / guide, full-screen run view with a pinned feedback bar. Chunky pressable buttons. */
+:root{
+  --bg:#EDF5F4; --surface:#FFFFFF; --surface2:#E3EFEE; --fg:#0C2B33; --muted:#4B6B71; --line:#C9DDDB;
+  --accent:#0B7C80; --accent-edge:#085A5D; --accent-fg:#FFFFFF; --accent-soft:#D3EDEC;
+  --sun:#F2B31B; --sun-edge:#BD8A06; --sun-fg:#2B1F00;
+  --good:#1E9B55; --good-edge:#14733E; --good-bg:#DDF4E6; --good-fg:#0E4C28;
+  --bad:#D9453D; --bad-edge:#A62F28; --bad-bg:#FBE4E2; --bad-fg:#7A1D18;
+  --f-display:'Bricolage Grotesque','Trebuchet MS',sans-serif; --f-body:'DM Sans',system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#08171B; --surface:#0F2429; --surface2:#16313A; --fg:#E6F2F1; --muted:#93B3B6; --line:#21424A;
+  --accent:#3CC4C0; --accent-edge:#1E8F8C; --accent-fg:#04191B; --accent-soft:#12383C;
+  --sun:#F5C13A; --sun-edge:#B88A12; --sun-fg:#2B1F00;
+  --good:#4BD186; --good-edge:#2A9A5C; --good-bg:#10321F; --good-fg:#BDF3D3;
+  --bad:#FF7B72; --bad-edge:#C4504A; --bad-bg:#3A1816; --bad-fg:#FFD0CC; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#08171B; --surface:#0F2429; --surface2:#16313A; --fg:#E6F2F1; --muted:#93B3B6; --line:#21424A;
+  --accent:#3CC4C0; --accent-edge:#1E8F8C; --accent-fg:#04191B; --accent-soft:#12383C;
+  --sun:#F5C13A; --sun-edge:#B88A12; --sun-fg:#2B1F00;
+  --good:#4BD186; --good-edge:#2A9A5C; --good-bg:#10321F; --good-fg:#BDF3D3;
+  --bad:#FF7B72; --bad-edge:#C4504A; --bad-bg:#3A1816; --bad-fg:#FFD0CC; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--f-body);font-size:16px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 90px}
+.wrap{max-width:760px;margin:0 auto;display:flex;flex-direction:column;gap:16px;min-width:0}
+h1,h2,h3{font-family:var(--f-display);margin:0;text-wrap:balance;line-height:1.15}
+h2{font-size:1.35rem} h3{font-size:1.05rem}
+p{margin:0}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
+.muted{color:var(--muted)} .small{font-size:.86rem}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.grow{flex:1;min-width:0}
+
+/* HUD */
+.hud{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{font-family:var(--f-display);font-weight:800;font-size:1.45rem;letter-spacing:-.01em;flex:1;white-space:nowrap}
+.brand span{color:var(--accent)}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:2px solid var(--line);border-radius:999px;padding:4px 12px;font-weight:700;font-size:.9rem;white-space:nowrap}
+.chip b{font-variant-numeric:tabular-nums}
+.lvl{display:flex;flex-direction:column;gap:4px;background:var(--surface);border:2px solid var(--line);border-radius:16px;padding:10px 14px}
+.bar{height:10px;background:var(--surface2);border-radius:99px;overflow:hidden}
+.bar>i{display:block;height:100%;background:var(--accent);border-radius:99px;transition:width .4s}
+.bar.sun>i{background:var(--sun)}
+.iconbtn{width:38px;height:38px;border-radius:12px;border:2px solid var(--line);background:var(--surface);display:grid;place-items:center;padding:0}
+.iconbtn svg{width:18px;height:18px;stroke:var(--fg);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Tabs */
+.tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;background:var(--surface2);padding:5px;border-radius:16px}
+.tab{border:0;background:transparent;border-radius:12px;padding:10px 6px;font-weight:700;color:var(--muted)}
+.tab[aria-selected="true"]{background:var(--surface);color:var(--fg);box-shadow:0 2px 0 var(--line)}
+
+/* Cards & buttons */
+.card{background:var(--surface);border:2px solid var(--line);border-radius:18px;padding:16px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.btn{border:0;border-radius:14px;padding:12px 18px;font-weight:700;background:var(--accent);color:var(--accent-fg);box-shadow:0 4px 0 var(--accent-edge);transition:transform .08s,box-shadow .08s;text-align:center}
+.btn:active{transform:translateY(3px);box-shadow:0 1px 0 var(--accent-edge)}
+.btn.sun{background:var(--sun);color:var(--sun-fg);box-shadow:0 4px 0 var(--sun-edge)}
+.btn.sun:active{box-shadow:0 1px 0 var(--sun-edge)}
+.btn.ghost{background:var(--surface);color:var(--fg);border:2px solid var(--line);box-shadow:0 4px 0 var(--line)}
+.btn.ghost:active{box-shadow:0 1px 0 var(--line)}
+.btn.good{background:var(--good);color:#fff;box-shadow:0 4px 0 var(--good-edge)}
+.btn.bad{background:var(--bad);color:#fff;box-shadow:0 4px 0 var(--bad-edge)}
+.btn[disabled]{opacity:.5;cursor:default}
+.btn.sm{padding:8px 12px;font-size:.9rem;border-radius:12px}
+
+/* Countdown banner */
+.next{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center;background:var(--accent);color:var(--accent-fg);border-radius:20px;padding:16px 18px}
+.next .days{font-family:var(--f-display);font-weight:800;font-size:3.2rem;line-height:1;font-variant-numeric:tabular-nums;grid-row:span 2}
+.next .lab{font-weight:700}
+.next .sub{opacity:.9;font-size:.9rem}
+.next .btn{grid-column:1/-1;justify-self:start;margin-top:6px}
+
+/* Unit cards */
+.units{display:grid;gap:12px}
+.unit{display:grid;grid-template-columns:52px 1fr auto;grid-template-areas:"badge meta go" "badge bar bar";gap:8px 14px;align-items:center}
+.badge{grid-area:badge;width:52px;height:52px;border-radius:16px;background:var(--accent-soft);color:var(--accent);font-family:var(--f-display);font-weight:800;font-size:1.6rem;display:grid;place-items:center;align-self:start}
+.stars{letter-spacing:2px;font-size:1.1rem;color:var(--line);white-space:nowrap}
+.stars .on{color:var(--sun)}
+.unit .bar{grid-area:bar}
+.unit .go{grid-area:go}
+.unit .meta{grid-area:meta;min-width:0}
+@media (max-width:480px){.unit{grid-template-columns:44px 1fr;grid-template-areas:"badge meta" "badge bar" "go go"}.badge{width:44px;height:44px;font-size:1.3rem}}
+.games{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.game{align-items:flex-start;justify-content:space-between}
+.game p{color:var(--muted);font-size:.9rem}
+.pill{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;background:var(--sun);color:var(--sun-fg);padding:2px 8px;border-radius:99px}
+
+/* Run view */
+.runtop{display:flex;align-items:center;gap:12px}
+.runtop .bar{flex:1}
+.hearts{font-weight:800;color:var(--bad);white-space:nowrap;font-variant-numeric:tabular-nums}
+.combo{font-weight:800;color:var(--sun-edge);min-width:3.2em;text-align:right}
+:root[data-theme="dark"] .combo{color:var(--sun)}
+.q{display:flex;flex-direction:column;gap:14px}
+.qtag{font-size:.78rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.qmain{font-family:var(--f-display);font-weight:800;font-size:clamp(1.5rem,5.5vw,2.1rem);line-height:1.2;overflow-wrap:anywhere;text-wrap:balance}
+.qsub{color:var(--muted)}
+.opts{display:grid;gap:10px}
+.opt{border:2px solid var(--line);background:var(--surface);border-radius:14px;padding:13px 14px;text-align:left;font-weight:500;box-shadow:0 3px 0 var(--line);display:flex;gap:12px;align-items:center;min-width:0;overflow-wrap:anywhere}
+.opt kbd{font:700 .8rem var(--f-body);width:24px;height:24px;border-radius:8px;background:var(--surface2);display:grid;place-items:center;flex:none;color:var(--muted)}
+.opt:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line)}
+.opt.ok{border-color:var(--good);background:var(--good-bg);color:var(--good-fg);box-shadow:0 3px 0 var(--good-edge)}
+.opt.no{border-color:var(--bad);background:var(--bad-bg);color:var(--bad-fg);box-shadow:0 3px 0 var(--bad-edge)}
+.opt[disabled]{cursor:default}
+.inp{width:100%;font:inherit;font-size:1.15rem;padding:13px 14px;border-radius:14px;border:2px solid var(--line);background:var(--surface);color:var(--fg)}
+.inp:focus{border-color:var(--accent);outline:none}
+.inp.ok{border-color:var(--good);background:var(--good-bg)} .inp.no{border-color:var(--bad);background:var(--bad-bg)}
+.accents{display:flex;gap:6px;flex-wrap:wrap}
+.accents button{min-width:40px;padding:6px 10px;border-radius:10px;border:2px solid var(--line);background:var(--surface2);font-weight:700}
+.tray,.bank{display:flex;flex-wrap:wrap;gap:8px;min-height:52px;padding:8px;border-radius:14px}
+.tray{border:2px dashed var(--line)}
+.tok{border:2px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 12px;font-weight:700;box-shadow:0 3px 0 var(--line)}
+.tok.used{opacity:.25;pointer-events:none}
+.feedback{position:fixed;left:0;right:0;bottom:0;padding:14px max(16px,env(safe-area-inset-left,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));z-index:20;border-top:2px solid}
+.feedback.ok{background:var(--good-bg);color:var(--good-fg);border-color:var(--good)}
+.feedback.no{background:var(--bad-bg);color:var(--bad-fg);border-color:var(--bad)}
+.feedback .in{max-width:760px;margin:0 auto;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.feedback .msg{flex:1;min-width:200px}
+.feedback .msg b{font-family:var(--f-display);font-size:1.2rem;display:block}
+.feedback .ans{font-weight:700}
+.say{display:inline-flex;align-items:center;gap:6px;border:2px solid var(--line);background:var(--surface);border-radius:12px;padding:6px 10px;font-weight:700;font-size:.85rem;align-self:flex-start}
+.say svg{width:16px;height:16px;stroke:var(--accent);fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+
+/* Results */
+.result{text-align:center;align-items:center}
+.bigstars{font-size:2.6rem;letter-spacing:6px;color:var(--line)} .bigstars .on{color:var(--sun)}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%}
+.stat div{background:var(--surface2);border-radius:14px;padding:10px}
+.stat b{display:block;font-family:var(--f-display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+.missed{width:100%;text-align:left;display:grid;gap:8px}
+.missed div{border:2px solid var(--line);border-radius:12px;padding:8px 12px}
+
+/* Match */
+.mgrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mgrid .col{display:grid;gap:10px;align-content:start}
+.mc{min-height:62px;display:grid;place-items:center;text-align:center;font-weight:700;padding:8px 10px;overflow-wrap:anywhere}
+.mc.sel{border-color:var(--accent);background:var(--accent-soft)}
+.mc.done{visibility:hidden}
+.mc.shake{border-color:var(--bad);background:var(--bad-bg);animation:shake .3s}
+@keyframes shake{25%{transform:translateX(-5px)}75%{transform:translateX(5px)}}
+
+/* Flashcards */
+.flash{perspective:900px}
+.fc{min-height:220px;border-radius:20px;border:2px solid var(--line);background:var(--surface);box-shadow:0 5px 0 var(--line);display:grid;place-items:center;text-align:center;padding:24px;cursor:pointer;width:100%}
+.fc .qmain{text-align:center}
+.fc.back{background:var(--accent-soft);border-color:var(--accent)}
+
+/* Gym table */
+.gym{display:grid;grid-template-columns:minmax(90px,auto) 1fr;gap:10px;align-items:center}
+.gym label{font-weight:700}
+.gym .inp{padding:9px 12px;font-size:1rem}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chipbtn{border:2px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 14px;font-weight:700}
+.chipbtn[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+
+/* Guide */
+.tablewrap{overflow-x:auto;border:2px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;font-size:.92rem}
+th,td{padding:8px 10px;text-align:left;border-bottom:1px solid var(--line);vertical-align:top}
+th{background:var(--surface2);font-size:.78rem;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+tr:last-child td{border-bottom:0}
+.phr{display:grid;grid-template-columns:1fr 1fr;gap:6px 14px}
+@media (max-width:480px){.phr{grid-template-columns:1fr}}
+.phr div{padding:6px 0;border-bottom:1px solid var(--line)}
+.phr b{display:block}
+.today{outline:3px solid var(--sun);outline-offset:-3px}
+.script p{padding:10px 0;border-bottom:1px solid var(--line)}
+.script .es{font-weight:700;font-size:1.05rem}
+.hide-es .es,.hide-en .en{filter:blur(7px);cursor:pointer;user-select:none}
+.hide-es .es.show,.hide-en .en.show{filter:none}
+.toast{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:var(--sun);color:var(--sun-fg);font-weight:800;padding:10px 18px;border-radius:99px;z-index:30;box-shadow:0 4px 0 var(--sun-edge)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<div id="app" class="wrap"></div>
+<script>
+/* ---------- DATA (from the SPA101 cheat sheet) ---------- */
+const UNITS=[
+ {n:1,name:'Greetings, Alphabet & Classroom'},
+ {n:2,name:'Family, Ser/Tener & Present Tense'},
+ {n:3,name:'University Life, Work & Routines'},
+ {n:4,name:'Shopping, Weather & Estar'},
+ {n:5,name:'Preferences, Future Plans & Monologue'}];
+const ASSESS=[
+ {name:'Mid-Semester Exam',start:'2026-10-25',end:'2026-10-31',w:'20%',focus:'Units 1 & 2 (in-class, closed book)',sim:'mid'},
+ {name:'Group Oral Presentation',start:'2026-11-07',end:'2026-11-07',w:'15%',focus:'Conversations and roleplays (Moodle)'},
+ {name:'Homework / Classwork',start:'2026-11-12',end:'2026-11-12',w:'5%',focus:'Written assignment / formal letter (Moodle)'},
+ {name:'Individual Oral Monologue',start:'2026-12-05',end:'2026-12-05',w:'20%',focus:'3-minute Zoom talk: self, routine, plans',sim:'mono'},
+ {name:'Final Written Exam',start:'2026-12-08',end:'2026-12-21',w:'40%',focus:'Everything, Units 1 to 5',sim:'final'}];
+
+// [unit, cat, spanish, english, accepted typed answers (default: spanish), noType]
+const RAW=[
+ [1,'greet','¡Hola!','Hello',['hola']],
+ [1,'greet','Buenos días','Good morning'],
+ [1,'greet','Buenas tardes','Good afternoon'],
+ [1,'greet','Buenas noches','Good evening / night'],
+ [1,'greet','¿Cómo te llamas?','What is your name? (informal)'],
+ [1,'greet','Me llamo...','My name is...',['me llamo']],
+ [1,'greet','Mucho gusto / Encantado(a)','Nice to meet you',['mucho gusto','encantado','encantada']],
+ [1,'greet','¿De dónde eres?','Where are you from?'],
+ [1,'greet','Soy de Jamaica','I am from Jamaica'],
+ [1,'greet','¿Cómo estás?','How are you?'],
+ [1,'class','No entiendo',"I don't understand"],
+ [1,'class','Repita, por favor','Please repeat'],
+ [1,'class','¿Cómo se dice ... en español?','How do you say ... in Spanish?',['¿cómo se dice en español?','como se dice en español']],
+ [1,'class','¿Qué significa ...?','What does ... mean?',['¿qué significa?','que significa']],
+ [1,'class','Escriban / Lean / Escuchen','Write / Read / Listen',['escriban','lean','escuchen'],1],
+ [2,'age','¿Cuántos años tienes?','How old are you?'],
+ [2,'age','Tengo 24 años','I am 24 years old'],
+ [3,'job','contable','accountant'],
+ [3,'job','profesor(a)','teacher / professor',['profesor','profesora','profesor(a)']],
+ [3,'job','médico(a)','doctor',['médico','médica','médico(a)']],
+ [3,'job','estudiante','student'],
+ [3,'job','ingeniero(a)','engineer',['ingeniero','ingeniera','ingeniero(a)']],
+ [3,'place','la biblioteca','the library'],
+ [3,'place','el aula','the classroom'],
+ [3,'place','la cafetería','the cafeteria'],
+ [3,'place','el laboratorio','the laboratory'],
+ [3,'routine','levantarse (me levanto)','to get up',['levantarse','me levanto']],
+ [3,'routine','ducharse (me ducho)','to shower',['ducharse','me ducho']],
+ [3,'routine','acostarse (me acuesto)','to go to bed',['acostarse','me acuesto']],
+ [4,'weather','¿Qué tiempo hace?',"What's the weather like?"],
+ [4,'weather','Hace calor',"It's hot"],
+ [4,'weather','Hace frío',"It's cold"],
+ [4,'weather','Hace sol',"It's sunny"],
+ [4,'weather','Está lloviendo',"It's raining"],
+ [4,'num','cien','100'],
+ [4,'num','ciento uno','101'],
+ [4,'num','doscientos','200'],
+ [4,'num','quinientos','500'],
+ [4,'num','mil','1,000'],
+ [4,'num','un millón','1,000,000',['un millón','un millon','1 millón']],
+ [5,'future','Voy a estudiar','I am going to study'],
+ [5,'pref','Me gusta la informática','I like computer science / IT'],
+ [5,'pref','Me gusta...','I like...',['me gusta']]
+];
+// Extra: the Unit 1 title says "Alphabet" but the sheet has no letters, so these are a bonus set.
+const LETTERS=[['ñ','eñe'],['h','hache'],['j','jota'],['w','uve doble'],['y','i griega'],['x','equis'],['v','uve'],['q','cu'],['z','zeta'],['g','ge'],['r','erre'],['k','ka']];
+const ITEMS=RAW.map((r,i)=>({id:'i'+i,u:r[0],cat:r[1],es:r[2],en:r[3],acc:r[4]||[r[2]],noType:!!r[5]}));
+LETTERS.forEach((l,i)=>ITEMS.push({id:'L'+i,u:1,cat:'alpha',es:l[1],en:'Letter "'+l[0].toUpperCase()+'"',acc:[l[1]],extra:true,letter:true}));
+
+const PRON=['yo','tú','él / ella / usted','nosotros','vosotros','ellos / ellas / ustedes'];
+const PSHORT=['Yo','Tú','Ella','Nosotros','Vosotros','Ellos'];
+const VERBS={
+ ser:{u:2,en:'to be (identity)',f:['soy','eres','es','somos','sois','son']},
+ tener:{u:2,en:'to have / age',f:['tengo','tienes','tiene','tenemos','tenéis','tienen']},
+ hablar:{u:2,en:'to speak (-AR)',f:['hablo','hablas','habla','hablamos','habláis','hablan']},
+ comer:{u:2,en:'to eat (-ER)',f:['como','comes','come','comemos','coméis','comen']},
+ vivir:{u:2,en:'to live (-IR)',f:['vivo','vives','vive','vivimos','vivís','viven']},
+ estar:{u:4,en:'to be (location / state)',f:['estoy','estás','está','estamos',null,'están']},
+ ir:{u:5,en:'to go',f:['voy','vas','va','vamos',null,'van']}};
+const REFL=[['levantarse','me levanto','to get up'],['ducharse','me ducho','to shower'],['acostarse','me acuesto','to go to bed']];
+
+// [unit, sentence with ___, answer, english, hint]
+const SENTS=[
+ [1,'Me ___ Bilton.','llamo','My name is Bilton.','llamarse'],
+ [1,'¿Cómo te ___?','llamas','What is your name?','llamarse'],
+ [1,'___ de Jamaica.','Soy','I am from Jamaica.','ser'],
+ [1,'¿De dónde ___ ?','eres','Where are you from?','ser'],
+ [1,'Buenas ___ . (9 p.m.)','noches','Good evening.',''],
+ [2,'Yo ___ de Jamaica.','soy','I am from Jamaica.','ser'],
+ [2,'Tú ___ estudiante.','eres','You are a student.','ser'],
+ [2,'Ella ___ contable.','es','She is an accountant.','ser'],
+ [2,'Nosotros ___ estudiantes.','somos','We are students.','ser'],
+ [2,'Ellos ___ de Jamaica.','son','They are from Jamaica.','ser'],
+ [2,'¿Cuántos años ___ tú?','tienes','How old are you?','tener'],
+ [2,'Yo ___ 24 años.','tengo','I am 24 years old.','tener'],
+ [2,'Ella ___ 20 años.','tiene','She is 20 years old.','tener'],
+ [2,'Nosotros ___ una mesa.','tenemos','We have a table.','tener'],
+ [2,'Ellos ___ 19 años.','tienen','They are 19 years old.','tener'],
+ [2,'Yo ___ español. (hablar)','hablo','I speak Spanish.','hablar'],
+ [2,'Nosotros ___ en la cafetería. (comer)','comemos','We eat in the cafeteria.','comer'],
+ [2,'Ella ___ en Jamaica. (vivir)','vive','She lives in Jamaica.','vivir'],
+ [2,'Ellos ___ español. (hablar)','hablan','They speak Spanish.','hablar'],
+ [2,'Tú ___ en Kingston. (vivir)','vives','You live in Kingston.','vivir'],
+ [3,'Yo ___ a las 7:00. (levantarse)','me levanto','I get up at 7:00.','levantarse'],
+ [3,'Yo ___ por la mañana. (ducharse)','me ducho','I shower in the morning.','ducharse'],
+ [3,'Yo ___ por la noche. (acostarse)','me acuesto','I go to bed at night.','acostarse'],
+ [3,'Soy ___ . (accountant)','contable','I am an accountant.',''],
+ [3,'Yo estudio en la ___ . (library)','biblioteca','I study in the library.',''],
+ [4,'Yo ___ en la biblioteca.','estoy','I am in the library.','estar'],
+ [4,'Tú ___ en el aula.','estás','You are in the classroom.','estar'],
+ [4,'Ella ___ en el laboratorio.','está','She is in the laboratory.','estar'],
+ [4,'Nosotros ___ en la cafetería.','estamos','We are in the cafeteria.','estar'],
+ [4,'Ellos ___ en la biblioteca.','están','They are in the library.','estar'],
+ [4,'¿Qué ___ hace?','tiempo','What is the weather like?',''],
+ [4,'Hace ___ . (hot)','calor','It is hot.',''],
+ [4,'Hace ___ . (cold)','frío','It is cold.',''],
+ [4,'___ lloviendo.','Está','It is raining.','estar'],
+ [5,'Yo ___ a estudiar.','voy','I am going to study.','ir'],
+ [5,'Tú ___ a comer.','vas','You are going to eat.','ir'],
+ [5,'Ella ___ a viajar.','va','She is going to travel.','ir'],
+ [5,'Nosotros ___ a estudiar.','vamos','We are going to study.','ir'],
+ [5,'Ellos ___ a tomar más clases.','van','They are going to take more classes.','ir'],
+ [5,'Tengo 24 ___ y soy de Jamaica.','años','I am 24 and I am from Jamaica.','',1],
+ [5,'Soy ___ en la universidad UCC.','estudiante','I am a student at UCC.','',1],
+ [5,'Estudio ___ .','contabilidad','I study accounting.','',1],
+ [5,'Por la mañana, me ___ a las 7:00 y tomo café.','levanto','In the morning I get up at 7:00 and have coffee.','levantarse',1],
+ [5,'Me ___ la informática.','gusta','I like computer science.','',1],
+ [5,'El próximo semestre, ___ a tomar más clases.','voy','Next semester I am going to take more classes.','ir',1],
+ [5,'... y voy a ___ .','viajar','... and I am going to travel.','',1]
+];
+
+// [unit, question, options (first is correct), explanation]
+const RULES=[
+ [2,'Which verb do you use to tell your age?',['TENER','SER','ESTAR','IR'],'Age uses TENER: Tengo 24 años. Never ser or estar.'],
+ [2,'SER is used for…',['identity and permanent traits','location','temporary feelings','future plans'],'SER = permanent / identity. Estar covers location and temporary states.'],
+ [2,'What is the "yo" form of a regular -AR verb like hablar?',['hablo','hablas','habla','hablamos'],'-AR: o, as, a, amos, áis, an.'],
+ [2,'What is the "nosotros" ending of a regular -IR verb?',['-imos','-emos','-amos','-ís'],'vivimos. -IR: o, es, e, imos, ís, en.'],
+ [2,'What is the "vosotros" form of comer?',['coméis','comen','comemos','comes'],'-ER: o, es, e, emos, éis, en.'],
+ [2,'Which pronoun group uses "tienen"?',['ellos / ellas / ustedes','nosotros','tú','yo'],'Ellos / ellas / ustedes = tienen, and also son.'],
+ [2,'Which verb is irregular in the yo form: tengo, hablo, como?',['tengo','hablo','como','vivo'],'Tener is irregular (tengo). Hablo, como and vivo are regular.'],
+ [4,'ESTAR is used for…',['position, location, action, condition, emotion','identity and age','professions','permanent traits only'],'Remember PLACE: Position, Location, Action, Condition, Emotion.'],
+ [4,'What does the PLACE memory trick stand for?',['Position, Location, Action, Condition, Emotion','People, Language, Age, Country, Education','Present, Last, Action, Case, Ending','Place, Locate, Arrive, Come, Enter'],'PLACE is the reminder for when to use ESTAR.'],
+ [4,'Which verb is used to say where something is?',['ESTAR','SER','TENER','IR'],'Location always takes ESTAR: Estoy en la biblioteca.'],
+ [4,'How do you say 200?',['doscientos','dos cien','ciento dos','doscientas cien'],'200 = doscientos.'],
+ [4,'101 is…',['ciento uno','cien uno','cien y uno','un ciento'],'100 alone is "cien", but 101 is "ciento uno".'],
+ [5,'The near future formula is…',['IR + A + infinitive','TENER + A + infinitive','ESTAR + infinitive','SER + A + infinitive'],'Voy a estudiar = I am going to study.'],
+ [5,'Which is the correct "nosotros" form of IR?',['vamos','vas','van','voy'],'voy, vas, va, vamos, van.']
+];
+const NOUNS=[['libro','m'],['mesa','f'],['biblioteca','f'],['cafetería','f'],['laboratorio','m']];
+const ARTS={def:{ms:'el',mp:'los',fs:'la',fp:'las'},ind:{ms:'un',mp:'unos',fs:'una',fp:'unas'}};
+const MONO=[
+ ['Greeting & Intro','¡Hola! Me llamo Bilton. Tengo 24 años y soy de Jamaica.','Hello! My name is Bilton. I am 24 years old and I am from Jamaica.'],
+ ['Academic & Profession','Soy estudiante en la universidad UCC. Estudio contabilidad.','I am a student at UCC. I study accounting.'],
+ ['Daily Routine','Por la mañana, me levanto a las 7:00 y tomo café. Estudio en la biblioteca.','In the morning I get up at 7:00 and have coffee. I study in the library.'],
+ ['Preferences & Future Plans','Me gusta la informática. El próximo semestre, voy a tomar más clases y voy a viajar.','I like computer science. Next semester I am going to take more classes and I am going to travel.']];
+const SCRAMBLE=[[1,'¿De dónde eres?','Where are you from?'],[1,'¿Cómo te llamas?','What is your name?'],[1,'Soy de Jamaica','I am from Jamaica'],[1,'Repita, por favor','Please repeat'],[2,'Tengo 24 años','I am 24 years old'],[2,'¿Cuántos años tienes?','How old are you?'],[4,'¿Qué tiempo hace?','What is the weather like?'],[5,'Voy a estudiar','I am going to study'],[5,'Me gusta la informática','I like computer science'],[5,'Estudio en la biblioteca','I study in the library'],[5,'Voy a tomar más clases','I am going to take more classes']];
+/* ---------- HELPERS ---------- */
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const rnd=a=>a[Math.floor(Math.random()*a.length)];
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const norm=s=>String(s).toLowerCase().replace(/[¿¡?!.,;:…"]/g,'').replace(/\s+/g,' ').trim();
+const strip=s=>s.replace(/ñ/g,'\u0001').normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/\u0001/g,'ñ');
+function check(input,acc){
+  const n=norm(input);
+  if(acc.some(a=>norm(a)===n))return{ok:true};
+  if(acc.some(a=>strip(norm(a))===strip(n)))return S.strict?{ok:false,note:'Close. Check the accents.'}:{ok:true,note:'Accepted. With accents: '+acc[0]};
+  return{ok:false};
+}
+const pad=n=>String(n).padStart(2,'0');
+const dayKey=d=>d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());
+
+/* ---------- STATE ---------- */
+const defState=()=>({xp:0,streak:0,last:'',best:{},mastery:{},strict:false,sound:true,runs:0});
+let S=(()=>{try{const r=JSON.parse(localStorage.getItem('spa101-quest'));if(r)return Object.assign(defState(),r)}catch(e){}return defState()})();
+const save=()=>{try{localStorage.setItem('spa101-quest',JSON.stringify(S))}catch(e){}};
+const LEVELS=['Turista','Viajero','Estudiante','Conversador','Hablante','Políglota','Maestro'];
+const lvlOf=xp=>Math.floor(xp/150)+1;
+const lvlName=l=>LEVELS[Math.min(l-1,LEVELS.length-1)];
+function addXP(n){
+  const before=lvlOf(S.xp);S.xp+=n;const after=lvlOf(S.xp);
+  if(after>before)toast('Level up! '+lvlName(after));
+  save();
+}
+function bumpStreak(){
+  const t=dayKey(new Date());if(S.last===t)return;
+  const y=new Date();y.setDate(y.getDate()-1);
+  S.streak=S.last===dayKey(y)?S.streak+1:1;S.last=t;
+}
+function toast(m){const e=document.createElement('div');e.className='toast';e.textContent=m;document.body.appendChild(e);setTimeout(()=>e.remove(),2200)}
+let actx;
+function tone(f,d=.12){
+  if(!S.sound)return;
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    f.forEach((fr,i)=>{const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=fr;o.type='triangle';
+      const t=actx.currentTime+i*d;g.gain.setValueAtTime(.12,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g);g.connect(actx.destination);o.start(t);o.stop(t+d)})}catch(e){}
+}
+function speak(t){
+  try{const u=new SpeechSynthesisUtterance(t.replace(/\(a\)/g,'a').replace(/\.\.\./g,'').replace(/\s*\/\s*/g,', ').replace(/[\[\]]/g,''));
+    const v=speechSynthesis.getVoices().find(v=>/^es/i.test(v.lang));if(v)u.voice=v;u.lang=v?v.lang:'es-ES';u.rate=.85;
+    speechSynthesis.cancel();speechSynthesis.speak(u)}catch(e){}
+}
+const SAYSVG='<svg viewBox="0 0 24 24"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+const sayBtn=t=>`<button class="say" data-act="say" data-text="${esc(t)}" aria-label="Hear it">${SAYSVG}Listen</button>`;
+
+/* ---------- QUESTIONS ---------- */
+function itemQs(it){
+  const sameCat=ITEMS.filter(x=>x!==it&&x.cat===it.cat),other=ITEMS.filter(x=>x!==it&&x.cat!==it.cat&&!x.extra===!it.extra);
+  const pick=f=>{const own=f(it);const a=[...new Set(shuffle(sameCat).map(f))].filter(v=>v!==own);
+    const b=[...new Set(shuffle(other).map(f))].filter(v=>v!==own&&!a.includes(v));return a.concat(b).slice(0,3)};
+  const out=[];
+  out.push({id:it.id,u:it.u,kind:'mc',tag:it.letter?'Which letter is this?':'What does it mean?',main:it.es,speak:it.es,sayFirst:true,
+    answer:it.en,opts:shuffle([it.en,...pick(x=>x.en)])});
+  out.push({id:it.id,u:it.u,kind:'mc',tag:it.letter?'What is this letter called?':'How do you say it in Spanish?',main:it.en,speak:it.es,
+    answer:it.es,opts:shuffle([it.es,...pick(x=>x.es)])});
+  if(!it.noType)out.push({id:it.id,u:it.u,kind:'type',tag:'Type it in Spanish',main:it.en,speak:it.es,answer:it.es,acc:it.acc});
+  return out;
+}
+function conjQs(){
+  const out=[];
+  for(const [v,d] of Object.entries(VERBS)){
+    d.f.forEach((f,pi)=>{
+      if(!f)return;
+      const id='c:'+v+':'+pi,main=`${PSHORT[pi]} ___  (${v})`,sub=pi===4?'vosotros = you all (Spain)':pi===2?'él / ella / usted':pi===5?'ellos / ellas / ustedes':'';
+      const others=d.f.filter((x,i)=>x&&x!==f);
+      const cross=Object.values(VERBS).map(o=>o.f[pi]).filter(x=>x&&x!==f&&!others.includes(x));
+      const opts=[...new Set(shuffle(others).slice(0,2).concat(shuffle(cross).slice(0,1)))];
+      out.push({id,u:d.u,kind:'mc',tag:'Pick the right form',main,sub,answer:f,opts:shuffle([f,...opts].slice(0,4)),speak:f});
+      out.push({id,u:d.u,kind:'type',tag:'Type the right form',main,sub,answer:f,acc:[f],speak:f});
+    });
+  }
+  REFL.forEach(([inf,form,en],i)=>{
+    const id='rf:'+i,base=form.replace('me ','');
+    out.push({id,u:3,kind:'type',tag:'Reflexive verb',main:`Yo ___  (${inf})`,sub:en,answer:form,acc:[form],speak:form});
+    out.push({id,u:3,kind:'mc',tag:'Reflexive verb',main:`Yo ___  (${inf})`,sub:en,answer:form,speak:form,opts:shuffle([form,...REFL.filter(r=>r[1]!==form).map(r=>r[1]),base])});
+  });
+  return out;
+}
+function sentQs(){
+  const out=[];
+  SENTS.forEach((s,i)=>{
+    const [u,t,a,en,hint,mono]=s,id='s'+i;
+    const base={id,u,main:t,sub:en,answer:a,speak:t.replace('___',a),mono:!!mono};
+    out.push({...base,kind:'type',tag:'Fill in the blank',acc:[a]});
+    let pool=[];
+    if(VERBS[hint])pool=VERBS[hint].f.filter(x=>x&&norm(x)!==norm(a));
+    else pool=SENTS.filter((x,j)=>j!==i&&norm(x[2])!==norm(a)).map(x=>x[2]);
+    pool=[...new Set(shuffle(pool).map(x=>x))].slice(0,3);
+    if(pool.length>=2)out.push({...base,kind:'mc',tag:'Pick the missing word',opts:shuffle([a,...pool])});
+  });
+  return out;
+}
+function ruleQs(){
+  return RULES.map((r,i)=>({id:'ru'+i,u:r[0],kind:'mc',tag:'Grammar',main:r[1],answer:r[2][0],opts:shuffle(r[2]),expl:r[3]}));
+}
+function artQs(){
+  const out=[];
+  NOUNS.forEach(([n,g])=>{
+    for(const type of ['def','ind'])for(const num of ['s','p']){
+      const key=g+num,ans=ARTS[type][key],word=num==='s'?n:n.replace(/o$/,'o')+'s';
+      const noun=num==='s'?n:(n.endsWith('a')||n.endsWith('o')?n+'s':n+'s');
+      out.push({id:'a:'+n+type+num,u:1,kind:'mc',tag:'Pick the article',main:`___ ${noun}`,
+        sub:(type==='def'?'the':num==='s'?'a / an':'some')+(num==='p'?' (plural)':''),answer:ans,opts:shuffle(Object.values(ARTS[type])),
+        expl:`${type==='def'?'Definite':'Indefinite'} articles: ${Object.values(ARTS[type]).join(', ')}. ${n} is ${g==='m'?'masculine':'feminine'}.`});
+    }
+  });
+  return out;
+}
+function orderQs(){
+  const out=[];
+  SCRAMBLE.forEach((s,i)=>out.push({id:'o'+i,u:s[0],kind:'order',tag:'Put the words in order',main:s[2],answer:s[1],speak:s[1],mono:[5].includes(s[0])}));
+  MONO.forEach((m,mi)=>{
+    m[1].split(/(?<=[.!])\s+/).forEach((sen,si)=>{
+      if(sen.split(' ').length>=4)out.push({id:'m'+mi+'_'+si,u:5,kind:'order',tag:'Rebuild your monologue',main:m[2].split(/(?<=[.!])\s+/)[si]||m[2],answer:sen,speak:sen,mono:true});
+    });
+  });
+  return out;
+}
+let _all=null;
+function allQs(){
+  if(_all)return _all;
+  _all=ITEMS.flatMap(itemQs).concat(conjQs(),sentQs(),ruleQs(),artQs(),orderQs());
+  return _all;
+}
+const regen=()=>{_all=null};
+const mast=id=>S.mastery[id]||0;
+function unitStats(u){
+  const ids=[...new Set(allQs().filter(q=>q.u===u&&!String(q.id).startsWith('L')).map(q=>q.id))];
+  const done=ids.filter(id=>mast(id)>=2).length;
+  return{total:ids.length,done,pct:ids.length?Math.round(done/ids.length*100):0};
+}
+function buildRun(filter,n,opts={}){
+  regen();
+  let pool=allQs().filter(filter);
+  if(opts.mcOnly)pool=pool.filter(q=>q.kind==='mc');
+  const byId={};
+  pool.forEach(q=>{(byId[q.id]=byId[q.id]||[]).push(q)});
+  const picks=Object.values(byId).map(v=>rnd(v));
+  picks.sort((a,b)=>(mast(a.id)+Math.random()*1.6)-(mast(b.id)+Math.random()*1.6));
+  return shuffle(picks.slice(0,n));
+}
+/* ---------- RUN ENGINE ---------- */
+let R=null,V={name:'home',tab:'map'},scope='all',timer=null,lastCfg=null,M=null,F=null,G={verb:'ser',vals:[],res:null},L={hideEs:false,hideEn:false};
+const unitFilter=u=>q=>q.u===u&&!String(q.id).startsWith('L');
+function go(name,extra){clearInterval(timer);V={...V,name,...(extra||{})};render();window.scrollTo(0,0)}
+function startRun(cfg){
+  lastCfg=cfg;
+  const qs=buildRun(cfg.filter,cfg.n,{mcOnly:cfg.kind==='speed'});
+  R={cfg,kind:cfg.kind,title:cfg.title,qs,i:0,hearts:cfg.hearts,xp:0,correct:0,wrong:0,combo:0,maxCombo:0,first:0,firstOk:0,missed:[],answered:false,picked:null,typed:'',order:[],tokens:[]};
+  prepQ();
+  if(cfg.kind==='speed'){R.end=Date.now()+60000;timer=setInterval(tick,250)}
+  V.name='run';render();window.scrollTo(0,0);
+}
+function prepQ(){const q=R.qs[R.i];R.tokens=q&&q.kind==='order'?shuffle(q.answer.split(' ')):[];if(q&&q.kind==='order'&&R.tokens.join(' ')===q.answer)R.tokens=R.tokens.reverse()}
+function tick(){
+  const left=Math.max(0,R.end-Date.now());
+  const n=$('#tnum'),b=$('#tbar');if(n)n.textContent=Math.ceil(left/1000);if(b)b.style.width=(left/600)+'%';
+  if(left<=0)finishRun(true);
+}
+function resolve(ok,note){
+  const q=R.qs[R.i];if(R.answered)return;
+  R.answered=true;R.ok=ok;R.note=note||'';
+  if(!q.retry){R.first++;if(ok)R.firstOk++}
+  if(ok){R.combo++;R.maxCombo=Math.max(R.maxCombo,R.combo);R.gain=(R.kind==='speed'?5:10)+Math.min(R.combo-1,5)*2;R.xp+=R.gain;R.correct++;S.mastery[q.id]=Math.min(3,mast(q.id)+1);tone([660,880])}
+  else{R.combo=0;R.gain=0;R.wrong++;if(R.hearts!==Infinity)R.hearts--;if(!R.missed.find(m=>m.id===q.id))R.missed.push(q);S.mastery[q.id]=0;
+    if(R.kind==='unit'&&!q.retry)R.qs.push({...q,retry:true});tone([300,220],.15)}
+  render();
+  if(R.kind==='speed')setTimeout(()=>{if(R&&V.name==='run')next()},650);
+}
+function next(){
+  if(!R.answered)return;
+  R.answered=false;R.picked=null;R.typed='';R.order=[];
+  if(R.hearts<=0)return finishRun(false);
+  R.i++;
+  if(R.i>=R.qs.length)return finishRun(true);
+  prepQ();render();
+}
+function finishRun(completed){
+  clearInterval(timer);if(V.name!=='run')return;
+  const acc=R.first?R.firstOk/R.first:0;let stars=0,bonus=0;
+  if(R.kind==='speed'){const b=S.best.speed||0;R.newBest=R.correct>b;if(R.newBest)S.best.speed=R.correct}
+  else if(completed){stars=acc>=.9?3:acc>=.7?2:acc>=.5?1:0;bonus=20+stars*10}
+  R.stars=stars;R.completed=completed;R.acc=Math.round(acc*100);R.total=R.xp+bonus;
+  if(R.cfg.key&&R.kind!=='speed'){S.best[R.cfg.key]=Math.max(S.best[R.cfg.key]||0,stars)}
+  bumpStreak();S.runs++;addXP(R.total);
+  V.name='result';render();window.scrollTo(0,0);
+}
+
+/* ---------- VIEWS ---------- */
+const starsHtml=n=>'<span class="stars">'+[1,2,3].map(i=>`<span class="${i<=n?'on':''}">★</span>`).join('')+'</span>';
+const XSVG='<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg>';
+function render(){
+  const a=$('#app');
+  if(V.name==='run')a.innerHTML=runHtml();
+  else if(V.name==='result')a.innerHTML=resultHtml();
+  else if(V.name==='match')a.innerHTML=matchHtml();
+  else if(V.name==='flash')a.innerHTML=flashHtml();
+  else if(V.name==='gym')a.innerHTML=gymHtml();
+  else if(V.name==='lab')a.innerHTML=labHtml();
+  else a.innerHTML=homeHtml();
+  if(V.name==='run'){const i=$('#ans');if(i&&!R.answered)i.focus({preventScroll:true})}
+}
+const topBar=(title)=>`<div class="runtop"><button class="iconbtn" data-act="home" aria-label="Back to home">${XSVG}</button><h2 class="grow">${esc(title)}</h2></div>`;
+
+function nextAssess(){
+  const now=new Date(),today=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+  const P=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)};
+  for(const a of ASSESS){const s=P(a.start),e=P(a.end);if(today<=e){return{a,days:Math.round((s-today)/864e5),open:today>=s}}}
+  return null;
+}
+const fmtD=s=>{const [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d).toLocaleDateString('en-US',{month:'short',day:'numeric'})};
+function simBtn(a){
+  if(a.sim==='mid')return `<button class="btn sun" data-act="exam" data-k="mid">Practice for it</button>`;
+  if(a.sim==='final')return `<button class="btn sun" data-act="exam" data-k="final">Practice for it</button>`;
+  if(a.sim==='mono')return `<button class="btn sun" data-act="lab">Open Monologue Lab</button>`;
+  return '';
+}
+function homeHtml(){
+  const l=lvlOf(S.xp),into=S.xp-(l-1)*150,na=nextAssess();
+  let banner='';
+  if(na){
+    const big=na.open?'Now':na.days,lab=na.open?`${na.a.name} window is open`:`${na.days===1?'day':'days'} until the ${na.a.name}`;
+    banner=`<div class="next"><div class="days">${big}</div><div class="lab">${esc(lab)}</div>
+      <div class="sub">${fmtD(na.a.start)}${na.a.end!==na.a.start?' to '+fmtD(na.a.end):''} · ${na.a.w} of your grade · ${esc(na.a.focus)}</div>${simBtn(na.a)}</div>`;
+  }
+  const hud=`<div class="hud"><div class="brand">SPA101 <span>Quest</span></div>
+    <span class="chip" title="Days in a row"><b>${S.streak}</b> day streak</span><span class="chip"><b>${S.xp}</b> XP</span></div>
+    <div class="lvl"><div class="row"><b>Level ${l}</b><span class="muted">${lvlName(l)}</span><span class="muted small" style="margin-left:auto">${into} / 150 XP</span></div>
+    <div class="bar sun"><i style="width:${into/150*100}%"></i></div></div>`;
+  const tabs=`<div class="tabs" role="tablist">${[['map','Missions'],['games','Games'],['guide','Guide']].map(([k,n])=>`<button class="tab" role="tab" aria-selected="${V.tab===k}" data-act="tab" data-k="${k}">${n}</button>`).join('')}</div>`;
+  let body='';
+  if(V.tab==='map')body=missionsHtml();else if(V.tab==='games')body=gamesHtml();else body=guideHtml();
+  return hud+banner+tabs+body;
+}
+function missionsHtml(){
+  const units=UNITS.map(u=>{const st=unitStats(u.n);return `<div class="card unit"><div class="badge">${u.n}</div>
+    <div class="meta"><h3>Unit ${u.n}</h3><div class="muted small">${esc(u.name)}</div><div class="small">${starsHtml(S.best['u'+u.n]||0)} <span class="muted">${st.pct}% mastered</span></div></div>
+    <button class="btn go" data-act="unit" data-u="${u.n}">Play</button><div class="bar"><i style="width:${st.pct}%"></i></div></div>`}).join('');
+  const sims=[['mid','Mid-Semester Simulation','20 questions from Units 1 and 2. No hearts, like the real thing.'],['final','Final Exam Simulation','30 questions from all five units.']].map(([k,t,d])=>
+    `<div class="card"><div class="row"><div class="grow"><h3>${t}</h3><p class="muted small">${d}</p>${S.best[k]!=null?`<p class="small">Best: ${starsHtml(S.best[k])}</p>`:''}</div><button class="btn sun" data-act="exam" data-k="${k}">Start</button></div></div>`).join('');
+  return `<div class="units">${units}</div><h2>Exam simulations</h2><div class="units">${sims}</div>
+    <h2>Settings</h2><div class="chips"><button class="chipbtn" aria-pressed="${S.sound}" data-act="set" data-k="sound">Sound effects</button>
+    <button class="chipbtn" aria-pressed="${S.strict}" data-act="set" data-k="strict">Strict accents</button></div>
+    <p class="muted small">With strict accents on, "esta" will not count for "está". Your real exam may mark accents, so turn this on when you are ready.</p>`;
+}
+function gamesHtml(){
+  const sc=['all',1,2,3,4,5].map(s=>`<button class="chipbtn" aria-pressed="${scope===s}" data-act="scope" data-k="${s}">${s==='all'?'All units':'Unit '+s}</button>`).join('');
+  const G=(t,d,act,btn,extra='')=>`<div class="card game"><div><h3>${t} ${extra}</h3><p>${d}</p></div><button class="btn sm" data-act="${act}">${btn}</button></div>`;
+  return `<div class="card"><h3>Practice scope</h3><div class="chips">${sc}</div><p class="muted small">Applies to Match Rush, Speed Round and Flashcards.</p></div>
+  <div class="games">
+   ${G('Match Rush','Pair 6 Spanish items with their meaning in as few moves as you can.','match','Play')}
+   ${G('Speed Round','60 seconds of quick multiple choice. Best: '+(S.best.speed||0)+'.','speed','Play')}
+   ${G('Conjugation Gym','Fill a whole verb table: ser, tener, estar, ir and regular verbs.','gym','Train')}
+   ${G('Flashcards','Flip through cards and keep the hard ones coming back.','flash','Study')}
+   ${G('Monologue Lab','Read, hide and rebuild your Dec 5 script (20% of your grade).','lab','Open')}
+   ${G('Alphabet Quest','Letter names like jota, equis and i griega.','alpha','Play','<span class="pill">Bonus</span>')}
+  </div>`;
+}
+function guideHtml(){
+  const na=nextAssess();
+  const rows=ASSESS.map(a=>`<tr class="${na&&na.a===a?'today':''}"><td><b>${a.name}</b></td><td>${fmtD(a.start)}${a.end!==a.start?' to '+fmtD(a.end):''}</td><td>${a.w}</td><td>${a.focus}</td></tr>`).join('');
+  const phr=u=>ITEMS.filter(x=>x.u===u&&!x.extra).map(x=>`<div><b>${esc(x.es)}</b><span class="muted">${esc(x.en)}</span></div>`).join('');
+  const conj=(vs)=>`<div class="tablewrap"><table><tr><th>Pronoun</th>${vs.map(v=>`<th>${v}</th>`).join('')}</tr>${PRON.map((p,i)=>`<tr><td>${p}</td>${vs.map(v=>`<td>${VERBS[v].f[i]||'—'}</td>`).join('')}</tr>`).join('')}</table></div>`;
+  return `<div class="card"><h3>Assessments</h3><div class="tablewrap"><table><tr><th>Item</th><th>When</th><th>Weight</th><th>Focus</th></tr>${rows}</table></div></div>
+  <div class="card"><h3>Unit 1: Greetings and classroom</h3><div class="phr">${phr(1)}</div>
+    <div class="tablewrap"><table><tr><th>Article</th><th>Masc. sing.</th><th>Masc. pl.</th><th>Fem. sing.</th><th>Fem. pl.</th></tr>
+    <tr><td>The</td><td>el libro</td><td>los libros</td><td>la mesa</td><td>las mesas</td></tr><tr><td>A / some</td><td>un libro</td><td>unos libros</td><td>una mesa</td><td>unas mesas</td></tr></table></div></div>
+  <div class="card"><h3>Unit 2: Ser, tener and the present tense</h3><p>Age always uses <b>TENER</b>: ¿Cuántos años tienes? Tengo 24 años.</p>${conj(['ser','tener'])}${conj(['hablar','comer','vivir'])}</div>
+  <div class="card"><h3>Unit 3: University, work and routines</h3><div class="phr">${phr(3)}</div></div>
+  <div class="card"><h3>Unit 4: Shopping, weather and estar</h3><p><b>ESTAR</b> = PLACE: position, location, action, condition, emotion.</p>${conj(['estar'])}<div class="phr">${phr(4)}</div></div>
+  <div class="card"><h3>Unit 5: Preferences and future plans</h3><p>Near future: <b>IR + A + infinitive</b>. Voy a estudiar.</p>${conj(['ir'])}</div>`;
+}
+function runHtml(){
+  const q=R.qs[R.i],sp=R.kind==='speed';
+  let top=`<div class="runtop"><button class="iconbtn" data-act="home" aria-label="Quit">${XSVG}</button>`;
+  if(sp){const left=Math.max(0,R.end-Date.now());top+=`<div class="bar sun"><i id="tbar" style="width:${left/600}%"></i></div><b id="tnum">${Math.ceil(left/1000)}</b><span class="combo">${R.correct} pts</span>`}
+  else top+=`<div class="bar"><i style="width:${R.i/R.qs.length*100}%"></i></div>${R.hearts!==Infinity?`<span class="hearts">♥ ${R.hearts}</span>`:''}<span class="combo">${R.combo>1?'x'+R.combo:''}</span>`;
+  top+='</div>';
+  let body=`<div class="qtag">${esc(R.title)} · ${esc(q.tag)}${q.retry?' · second try':''}</div><div class="qmain">${esc(q.main)}</div>`;
+  if(q.sub)body+=`<div class="qsub">${esc(q.sub)}</div>`;
+  if(q.speak&&(R.answered||q.sayFirst))body+=sayBtn(q.speak);
+  if(q.kind==='mc'){
+    body+='<div class="opts">'+q.opts.map((o,i)=>{
+      let c='';if(R.answered){if(o===q.answer)c=' ok';else if(R.picked===i)c=' no'}
+      return `<button class="opt${c}" data-act="pick" data-i="${i}" ${R.answered?'disabled':''}><kbd>${i+1}</kbd><span>${esc(o)}</span></button>`}).join('')+'</div>';
+  }else if(q.kind==='type'){
+    body+=`<input class="inp${R.answered?(R.ok?' ok':' no'):''}" id="ans" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Escribe aquí" value="${esc(R.typed)}" ${R.answered?'disabled':''}>`;
+    if(!R.answered)body+=`<div class="accents">${['á','é','í','ó','ú','ñ','¿','¡'].map(c=>`<button data-act="ch" data-c="${c}" aria-label="Insert ${c}">${c}</button>`).join('')}</div><button class="btn" data-act="check">Check</button>`;
+  }else{
+    body+=`<div class="tray" aria-label="Your answer">${R.order.map((t,k)=>`<button class="tok" data-act="unord" data-k="${k}" ${R.answered?'disabled':''}>${esc(R.tokens[t])}</button>`).join('')}</div>
+      <div class="bank">${R.tokens.map((t,i)=>`<button class="tok${R.order.includes(i)?' used':''}" data-act="ord" data-i="${i}">${esc(t)}</button>`).join('')}</div>`;
+    if(!R.answered)body+=`<button class="btn" data-act="check" ${R.order.length===R.tokens.length?'':'disabled'}>Check</button>`;
+  }
+  let fb='';
+  if(R.answered&&!sp){
+    const full=q.kind==='type'&&q.main.includes('___')?q.main.replace(/___\s*/,q.answer+' ').replace(/\s+/g,' ').trim():q.answer;
+    fb=`<div class="feedback ${R.ok?'ok':'no'}" role="status"><div class="in"><div class="msg">${R.ok?`<b>${rnd(['¡Muy bien!','¡Excelente!','¡Correcto!','¡Perfecto!'])} +${R.gain} XP</b>${R.note?esc(R.note):''}`
+      :`<b>Not quite</b>Answer: <span class="ans">${esc(full)}</span>${q.expl?'<br>'+esc(q.expl):''}${R.note?'<br>'+esc(R.note):''}`}</div>
+      <button class="btn ${R.ok?'good':'bad'}" data-act="next" id="nextbtn">Continue</button></div></div>`;
+  }
+  return top+`<div class="card q">${body}</div>`+fb;
+}
+function resultHtml(){
+  const sp=R.kind==='speed';
+  const title=sp?(R.newBest?'New best!':'Time!'):R.completed?(R.stars>=2?'¡Fantástico!':'¡Buen trabajo!'):'Out of hearts';
+  const stat=sp?[['Score',R.correct],['Best',S.best.speed||0],['XP','+'+R.total]]:[['Accuracy',R.acc+'%'],['XP','+'+R.total],['Best combo','x'+R.maxCombo]];
+  const star=sp?'':`<div class="bigstars">${[1,2,3].map(i=>`<span class="${i<=R.stars?'on':''}">★</span>`).join('')}</div>`;
+  const miss=R.missed.length?`<div class="missed"><h3>Review these</h3>${R.missed.map(q=>{const a=q.kind==='type'&&q.main.includes('___')?q.main.replace(/___\s*/,q.answer+' ').replace(/\s+/g,' ').trim():q.answer;
+    return `<div><b>${esc(a)}</b><div class="muted small">${esc(q.kind==='mc'&&q.sub?q.main+' · '+q.sub:q.main)}${q.expl?' · '+esc(q.expl):''}</div></div>`}).join('')}</div>`:'';
+  return `<div class="card result"><h2>${title}</h2>${star}<div class="stat">${stat.map(s=>`<div><b>${s[1]}</b><span class="muted small">${s[0]}</span></div>`).join('')}</div>
+    <p class="muted">${R.completed||sp?'':'Your answers still raised your mastery. Try again.'}</p>${miss}
+    <div class="row"><button class="btn sun" data-act="again">Play again</button><button class="btn ghost" data-act="home">Home</button></div></div>`;
+}
+
+/* Match */
+function pairsFor(sc){
+  const u=x=>sc==='all'||x===sc;
+  let p=ITEMS.filter(x=>!x.extra&&u(x.u)).map(x=>({es:x.es,en:x.en,speak:x.es,conj:false}));
+  for(const [v,d] of Object.entries(VERBS))if(u(d.u))d.f.forEach((f,i)=>{if(f)p.push({es:f,en:PSHORT[i].toLowerCase()+' · '+v,speak:f,conj:true})});
+  if(sc===3||sc==='all')REFL.forEach(r=>p.push({es:r[1],en:'yo · '+r[0],speak:r[1],conj:true}));
+  if(p.length<6&&sc!=='all')return pairsFor('all');
+  const se=new Set(),sn=new Set();return p.filter(x=>{if(se.has(x.es)||sn.has(x.en))return false;se.add(x.es);sn.add(x.en);return true});
+}
+function startMatch(){
+  const pick=shuffle(pairsFor(scope)).slice(0,6);
+  M={pairs:pick,left:shuffle(pick.map((p,i)=>i)),right:shuffle(pick.map((p,i)=>i)),l:null,r:null,done:new Set(),moves:0,t0:Date.now(),bad:null,fin:null};
+  go('match');
+}
+function matchHtml(){
+  const col=(side,order)=>`<div class="col">${order.map(i=>{
+    const sel=(side==='l'?M.l:M.r)===i,bad=M.bad&&M.bad[side==='l'?0:1]===i,dn=M.done.has(i);
+    return `<button class="opt mc${sel?' sel':''}${bad?' shake':''}${dn?' done':''}" data-act="m" data-s="${side}" data-i="${i}">${esc(side==='l'?M.pairs[i].es:M.pairs[i].en)}</button>`}).join('')}</div>`;
+  const fin=M.fin?`<div class="card result"><h2>¡Todo emparejado!</h2><div class="stat"><div><b>${M.fin.t}s</b><span class="muted small">Time</span></div><div><b>${M.moves}</b><span class="muted small">Moves</span></div><div><b>+${M.fin.xp}</b><span class="muted small">XP</span></div></div>
+    <div class="row"><button class="btn sun" data-act="match">Play again</button><button class="btn ghost" data-act="home">Home</button></div></div>`:'';
+  return topBar('Match Rush')+`<p class="muted">Tap a Spanish item, then its match. Six pairs. ${M.moves} moves so far.</p><div class="mgrid">${col('l',M.left)}${col('r',M.right)}</div>${fin}`;
+}
+function matchClick(s,i){
+  if(M.fin||M.done.has(i))return;
+  M[s]=i;
+  if(M.l!==null&&M.r!==null){
+    M.moves++;
+    if(M.l===M.r){M.done.add(M.l);M.l=M.r=null;tone([660,880]);
+      if(M.done.size===M.pairs.length){const t=Math.round((Date.now()-M.t0)/1000),xp=Math.max(10,40-(M.moves-6)*3);M.fin={t,xp};bumpStreak();addXP(xp)}}
+    else{M.bad=[M.l,M.r];M.l=M.r=null;tone([300,220],.15);setTimeout(()=>{if(M){M.bad=null;if(V.name==='match')render()}},350)}
+  }
+  render();
+}
+/* Flashcards */
+function startFlash(){F={deck:shuffle(pairsFor(scope)).slice(0,20),flip:false,known:0,total:0};F.total=F.deck.length;go('flash')}
+function flashHtml(){
+  if(!F.deck.length)return topBar('Flashcards')+`<div class="card result"><h2>Deck cleared</h2><p class="muted">You knew all ${F.total} cards.</p><div class="row"><button class="btn sun" data-act="flash">New deck</button><button class="btn ghost" data-act="home">Home</button></div></div>`;
+  const c=F.deck[0],front=c.conj?c.en:c.es,back=c.conj?c.es:c.en;
+  return topBar('Flashcards')+`<p class="muted">${F.deck.length} cards left. Tap the card to flip it.</p>
+   <button class="fc${F.flip?' back':''}" data-act="flip"><div class="qmain">${esc(F.flip?back:front)}</div></button>
+   <div class="row">${sayBtn(c.speak)}</div>
+   <div class="row"><button class="btn ghost grow" data-act="fl" data-k="again">Still learning</button><button class="btn good grow" data-act="fl" data-k="know">Got it</button></div>`;
+}
+/* Gym */
+function gymHtml(){
+  const v=VERBS[G.verb];
+  const chips=Object.keys(VERBS).map(k=>`<button class="chipbtn" aria-pressed="${G.verb===k}" data-act="gv" data-k="${k}">${k}</button>`).join('');
+  const rows=PRON.map((p,i)=>{if(!v.f[i])return '';
+    const r=G.res&&G.res[i];
+    return `<label for="g${i}">${p}</label><input class="inp${r?(r.ok?' ok':' no'):''}" id="g${i}" autocomplete="off" autocapitalize="off" spellcheck="false" value="${esc(G.vals[i]||'')}" ${G.res?'disabled':''}>${r&&!r.ok?`<span></span><span class="small">Answer: <b>${v.f[i]}</b></span>`:''}`}).join('');
+  const sc=G.res?G.res.filter(Boolean).filter(r=>r.ok).length:0,tot=v.f.filter(Boolean).length;
+  return topBar('Conjugation Gym')+`<div class="chips">${chips}</div><div class="card"><h3>${G.verb} <span class="muted small">${v.en}</span></h3><div class="gym">${rows}</div>
+    <div class="accents">${['á','é','í','ó','ú','ñ'].map(c=>`<button data-act="gch" data-c="${c}">${c}</button>`).join('')}</div>
+    ${G.res?`<p><b>${sc} / ${tot}</b> correct${sc===tot?'. ¡Perfecto!':''}</p><button class="btn sun" data-act="gnext">Next verb</button>`:`<button class="btn" data-act="gcheck">Check table</button>`}</div>`;
+}
+/* Lab */
+function labHtml(){
+  const sec=MONO.map((m,i)=>`<div class="card script"><div class="qtag">${m[0]}</div><p class="es" data-act="reveal">${esc(m[1])}</p><p class="en muted" data-act="reveal">${esc(m[2])}</p><div>${sayBtn(m[1])}</div></div>`).join('');
+  return topBar('Monologue Lab')+`<p class="muted">Your 3-minute Zoom talk on Dec 5 is worth 20%. Read it, hide it, say it out loud, then rebuild it.</p>
+    <div class="chips"><button class="chipbtn" aria-pressed="${L.hideEs}" data-act="lh" data-k="hideEs">Hide Spanish</button><button class="chipbtn" aria-pressed="${L.hideEn}" data-act="lh" data-k="hideEn">Hide English</button></div>
+    <div class="units ${L.hideEs?'hide-es':''} ${L.hideEn?'hide-en':''}">${sec}</div>
+    <button class="btn sun" data-act="mono">Practice the script</button>
+    <p class="muted small">Tap blurred text to peek. The script comes from your cheat sheet. Change the name, age and details so it is really about you.</p>`;
+}
+
+/* ---------- EVENTS ---------- */
+const exams={
+  mid:{title:'Mid-Sem Simulation',key:'mid',kind:'exam',hearts:Infinity,n:20,filter:q=>q.u<=2&&!String(q.id).startsWith('L')},
+  final:{title:'Final Simulation',key:'final',kind:'exam',hearts:Infinity,n:30,filter:q=>!String(q.id).startsWith('L')}};
+const act={
+  home(){clearInterval(timer);go('home')},
+  tab(d){V.tab=d.k;render()},
+  set(d){S[d.k]=!S[d.k];save();render()},
+  scope(d){scope=d.k==='all'?'all':Number(d.k);render()},
+  unit(d){const u=Number(d.u);startRun({title:'Unit '+u,key:'u'+u,kind:'unit',hearts:3,n:10,filter:unitFilter(u)})},
+  exam(d){startRun(exams[d.k])},
+  alpha(){startRun({title:'Alphabet',key:'alpha',kind:'unit',hearts:3,n:10,filter:q=>String(q.id).startsWith('L')})},
+  speed(){startRun({title:'Speed Round',kind:'speed',hearts:Infinity,n:80,filter:q=>(scope==='all'||q.u===scope)&&!String(q.id).startsWith('L')})},
+  mono(){startRun({title:'Monologue',key:'mono',kind:'unit',hearts:5,n:12,filter:q=>q.mono})},
+  match(){startMatch()},flash(){startFlash()},lab(){go('lab')},gym(){G={verb:G.verb,vals:[],res:null};go('gym')},
+  again(){startRun(lastCfg)},
+  say(d){speak(d.text)},
+  pick(d){if(R.answered)return;const q=R.qs[R.i],i=Number(d.i);R.picked=i;resolve(q.opts[i]===q.answer)},
+  ch(d){const i=$('#ans');if(!i||i.disabled)return;const s=i.selectionStart,e=i.selectionEnd;i.value=i.value.slice(0,s)+d.c+i.value.slice(e);i.focus();i.setSelectionRange(s+1,s+1)},
+  check(){
+    const q=R.qs[R.i];if(R.answered)return;
+    if(q.kind==='type'){const i=$('#ans');if(!i||!i.value.trim())return;R.typed=i.value;const r=check(i.value,q.acc);resolve(r.ok,r.note)}
+    else if(q.kind==='order'){if(R.order.length!==R.tokens.length)return;resolve(norm(R.order.map(i=>R.tokens[i]).join(' '))===norm(q.answer))}
+  },
+  ord(d){if(R.answered)return;const i=Number(d.i);if(!R.order.includes(i)){R.order.push(i);renderRunKeep()}},
+  unord(d){if(R.answered)return;R.order.splice(Number(d.k),1);renderRunKeep()},
+  next(){next()},
+  m(d){matchClick(d.s,Number(d.i))},
+  flip(){F.flip=!F.flip;render()},
+  fl(d){const c=F.deck.shift();F.flip=false;if(d.k==='again')F.deck.push(c);else{F.known++;if(!F.deck.length){bumpStreak();addXP(F.known*2)}}render()},
+  gv(d){G={verb:d.k,vals:[],res:null};render()},
+  gch(d){const el=document.activeElement;if(el&&el.id&&el.id[0]==='g'&&el.tagName==='INPUT'){const s=el.selectionStart;el.value=el.value.slice(0,s)+d.c+el.value.slice(el.selectionEnd);el.focus();el.setSelectionRange(s+1,s+1)}},
+  gcheck(){
+    const v=VERBS[G.verb];G.vals=[];G.res=[];let ok=0;
+    v.f.forEach((f,i)=>{if(!f)return;const val=($('#g'+i)||{}).value||'';G.vals[i]=val;const r=check(val,[f]);G.res[i]={ok:r.ok};
+      if(r.ok){ok++;S.mastery['c:'+G.verb+':'+i]=Math.min(3,mast('c:'+G.verb+':'+i)+1)}else S.mastery['c:'+G.verb+':'+i]=0});
+    tone(ok===v.f.filter(Boolean).length?[660,880,1100]:[400,300],.12);bumpStreak();addXP(ok*3);render();
+  },
+  gnext(){const ks=Object.keys(VERBS),i=ks.indexOf(G.verb);G={verb:ks[(i+1)%ks.length],vals:[],res:null};render()},
+  lh(d){L[d.k]=!L[d.k];render()},
+  reveal(d,el){el.classList.toggle('show')}
+};
+function renderRunKeep(){render()}
+document.addEventListener('click',e=>{
+  const t=e.target.closest('[data-act]');if(!t||t.disabled)return;
+  const f=act[t.dataset.act];if(f)f(t.dataset,t);
+});
+document.addEventListener('keydown',e=>{
+  if(V.name!=='run'||!R)return;
+  if(e.key==='Enter'){e.preventDefault();if(R.answered)next();else act.check()}
+  else if(/^[1-4]$/.test(e.key)&&!R.answered&&R.qs[R.i].kind==='mc'&&document.activeElement.tagName!=='INPUT'){
+    const i=Number(e.key)-1;if(R.qs[R.i].opts[i]!==undefined)act.pick({i})}
+});
+render();
+</script>
+
+</body>
+</html>
